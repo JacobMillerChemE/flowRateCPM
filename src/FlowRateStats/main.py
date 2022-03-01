@@ -3,11 +3,19 @@ import pandas as pd
 from ROC_analysis import roc_curve_constructor
 from sm_logistic_regression import logisticRegression
 import matplotlib.pyplot as plt
+import os 
+
+def get_data_path():
+    dirname = os.path.dirname(__file__)
+    data_path = dirname.replace('/src/FlowRateStats', '/dataFrame/Results3.csv')
+    return data_path
 
 
 if __name__ == '__main__':
+    path = get_data_path()
+    
     # Read Data Frame In #
-    df = pd.read_csv("Results3.csv", index_col=0)
+    df = pd.read_csv(path, index_col=0)
 
     # region Format input dataframe and drop outliers
     Q1, Q3 = np.percentile(df["Flowrate"], [25, 75])
