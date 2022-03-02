@@ -3,7 +3,8 @@ import pandas as pd
 from ROC_analysis import roc_curve_constructor
 from sm_logistic_regression import logisticRegression
 import matplotlib.pyplot as plt
-import os 
+import os
+import seaborn as sns
 
 def get_data_path():
     dirname = os.path.dirname(__file__)
@@ -57,6 +58,20 @@ if __name__ == '__main__':
     y = pd.DataFrame()
     y["FFR"] = df['FFR']
     y["binary"] = df['Diagnosis']
+
+    # Box Plots of high and low FFR groups
+    df['FFR_Label'] = np.where(df['Diagnosis']==1, r'FFR $\leq$ 0.8', 'FFR > 0.8')  
+    fig, axes = plt.subplots(figsize=(20,10), nrows=1, ncols=2)
+    axes[0].tick_params(axis='both', labelsize=20)
+    axes[1].tick_params(axis='both', labelsize=20)
+    sns.boxplot(df['FFR_Label'], df['%DS'], ax=axes[0])
+    sns.boxplot(df['FFR_Label'], df['Flowrate'], ax=axes[1])
+    axes[0].set_xlabel('')
+    axes[1].set_xlabel('')
+    axes[0].set_ylabel('%DS', fontsize=22)
+    axes[1].set_ylabel('Coronary Flow Rate', fontsize=22)
+    plt.show()
+    plt.close()
 
     # %DS Log Regressor
     DS_LR_fitted  = fast_regressor(X_array=X[['%DS']], y_array=y['binary'], 
