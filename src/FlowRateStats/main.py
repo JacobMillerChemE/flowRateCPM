@@ -5,6 +5,7 @@ from sm_logistic_regression import logisticRegression
 import matplotlib.pyplot as plt
 import os
 import seaborn as sns
+from statsmodels.graphics.factorplots import interaction_plot
 
 def get_data_path():
     dirname = os.path.dirname(__file__)
@@ -33,6 +34,22 @@ def fast_regressor(X_array, y_array, multicollinearity_check):
     get_model_metrics(reg.confusion_matrix)
     return reg_fitted
 
+def quartile_generator(data, feature, response):
+    quartiles = np.percentile(data[feature], [25, 50, 75, 100])
+    mean_responses = []
+    for i, quartile in enumerate(quartiles):
+        less_than_indices = df[df[feature] <= quartile]
+        if i != 0:
+            previous_less_than_indices = df[df[feature] <= quartiles[i-1]]
+            quartile_indices = pd.concat([less_than_indices, 
+                    previous_less_than_indices])
+            quartile_indices = quartile_indices.drop_duplicates(keep=False)
+            mean_responses.append(quartile_indices[response].mean())
+        else:
+            mean_responses.append(less_than_indices[response].mean())
+           
+    return mean_responses
+
 if __name__ == '__main__':
     path = get_data_path()
     
@@ -52,6 +69,21 @@ if __name__ == '__main__':
     df = df.drop(["Mean Area", "length", "Nominal", "Stenosis Position", "Beta"], axis=1)
     # endregion
 
+    mean_flowrate_responses = quartile_generator(df, 'Flowrate', 'FFR')
+    mean_DS_responses = quartile_generator(df, '%DS', 'FFR')
+    # mean_flowrate_responses = pd.Series(mean_flowrate_responses, name=i
+
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    fig = interaction_plot(
+    x=mean_flowrate_responses,
+    trace=mean_DS_responses,
+    response=days,
+    colors=["red", "blue"],
+    markers=["D", "^"],
+    ms=10,
+    ax=ax)
+
     # region CREATE INPUT AND TARGET ARRAYS
     X = df.drop(["FFR", "Diagnosis"], axis=1)  # Data frame with %DS and Nominal
     print(X.corr())
@@ -64,12 +96,14 @@ if __name__ == '__main__':
     fig, axes = plt.subplots(figsize=(20,10), nrows=1, ncols=2)
     axes[0].tick_params(axis='both', labelsize=20)
     axes[1].tick_params(axis='both', labelsize=20)
-    sns.boxplot(df['FFR_Label'], df['%DS'], ax=axes[0])
-    sns.boxplot(df['FFR_Label'], df['Flowrate'], ax=axes[1])
+    sns.boxplot(df['FFR_Label'], df['%DS'], ax=axes[0], showmeans=True,
+            meanprops={"marker":"o", "markerfacecolor":"white", "markersize":"10"})
+    sns.boxplot(df['FFR_Label'], df['Flowrate'], ax=axes[1], showmeans=True,
+            meanprops={"marker":"o", "markerfacecolor":"white", "markersize":"10"})
     axes[0].set_xlabel('')
     axes[1].set_xlabel('')
     axes[0].set_ylabel('%DS', fontsize=22)
-    axes[1].set_ylabel('Coronary Flow Rate', fontsize=22)
+    axes[1].set_ylabel('Coronary Flow Rate (ml/s)', fontsize=22)
     plt.show()
     plt.close()
 
@@ -113,6 +147,9 @@ if __name__ == '__main__':
             X=X[['%DS', 'Flowrate', 'Volume']], y_true=y['binary'],
             y_predict=None, ax=mla_roc.ROC.ax_, 
             name='%DS + Coronary Flow Rate + Volume')
-
+    
+    volume_roc.ROC.ax_.set_xlabel('1 - Specificity', fontsize=18)
+    volume_roc.ROC.ax_.set_ylabel('Sensitivity', fontsize=18)
+    volume_roc.ROC.ax_.tick_params(axis='both', labelsize=18)
     plt.plot([0, 1], [0, 1], c='black', linestyle='dashed')
     plt.show()
