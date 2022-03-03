@@ -34,21 +34,15 @@ def fast_regressor(X_array, y_array, multicollinearity_check):
     get_model_metrics(reg.confusion_matrix)
     return reg_fitted
 
-def quartile_generator(data, feature, response):
+def quartile_generator(data, feature):
     quartiles = np.percentile(data[feature], [25, 50, 75, 100])
-    mean_responses = []
-    for i, quartile in enumerate(quartiles):
-        less_than_indices = df[df[feature] <= quartile]
-        if i != 0:
-            previous_less_than_indices = df[df[feature] <= quartiles[i-1]]
-            quartile_indices = pd.concat([less_than_indices, 
-                    previous_less_than_indices])
-            quartile_indices = quartile_indices.drop_duplicates(keep=False)
-            mean_responses.append(quartile_indices[response].mean())
-        else:
-            mean_responses.append(less_than_indices[response].mean())
-           
-    return mean_responses
+    conditions = [(df[feature] <= quartiles[0]),
+            (df[feature] > quartiles[0]) & (df[feature] <= quartiles[1]),
+            (df[feature] > quartiles[1]) & (df[feature] <= quartiles[2]),
+            (df[feature] > quartiles[2]) & (df[feature] <= quartiles[3])]
+    values = (f'$\leq$ {quartiles[0]:.2f}', f'{quartiles[0]:.2f} to {quartiles[1]:.2f}',
+            f'{quartiles[1]:.2f} to {quartiles[2]:.2f}', f'{quartiles[2]:.2f} to {quartiles[3]:.2f}')
+    return conditions, values
 
 if __name__ == '__main__':
     path = get_data_path()
@@ -69,20 +63,26 @@ if __name__ == '__main__':
     df = df.drop(["Mean Area", "length", "Nominal", "Stenosis Position", "Beta"], axis=1)
     # endregion
 
-    mean_flowrate_responses = quartile_generator(df, 'Flowrate', 'FFR')
-    mean_DS_responses = quartile_generator(df, '%DS', 'FFR')
-    # mean_flowrate_responses = pd.Series(mean_flowrate_responses, name=i
+    q_conditions, q_values = quartile_generator(df, 'Flowrate')
+    # q_conditions = [(df['Flowrate'] <= 1.7475), (df['Flowrate'] > 1.7475)]
+    # q_values = ['Q &\leq$ 1.75', 'Q > 1.75']
+    ds_conditions = [(df['%DS'] <= 25), (df['%DS'] > 25)]
+    ds_values = ['%DS $\leq$ 25%', '%DS > 25%']
 
+    df['flowratelabel'] = np.select(q_conditions, q_values)
+    df['%DSlabel'] = np.select(ds_conditions, ds_values)
 
-    fig, ax = plt.subplots(figsize=(6, 6))
-    fig = interaction_plot(
-    x=mean_flowrate_responses,
-    trace=mean_DS_responses,
-    response=days,
+    fig1, ax = plt.subplots(figsize=(6, 6))
+    fig1 = interaction_plot(
+    x=df['flowratelabel'],
+    trace=df['%DSlabel'],
+    response=df['FFR'],
     colors=["red", "blue"],
-    markers=["D", "^"],
     ms=10,
-    ax=ax)
+    ax=ax,
+    xlabel='Coronary Flow Rate (ml/s)',
+    ylabel='FFR',
+    legendtitle='%DS')
 
     # region CREATE INPUT AND TARGET ARRAYS
     X = df.drop(["FFR", "Diagnosis"], axis=1)  # Data frame with %DS and Nominal
@@ -104,8 +104,6 @@ if __name__ == '__main__':
     axes[1].set_xlabel('')
     axes[0].set_ylabel('%DS', fontsize=22)
     axes[1].set_ylabel('Coronary Flow Rate (ml/s)', fontsize=22)
-    plt.show()
-    plt.close()
 
     # %DS Log Regressor
     DS_LR_fitted  = fast_regressor(X_array=X[['%DS']], y_array=y['binary'], 
