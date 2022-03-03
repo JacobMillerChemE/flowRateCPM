@@ -13,6 +13,10 @@ def get_data_path():
     return data_path
 
 def get_model_metrics(confusion_matrix):
+    ''' 
+        Calculates sensitivity, specificity, PPV and NPV given a 
+        confusion matrix from a logistic regression
+    '''
     tn, fp, fn, tp = confusion_matrix.ravel()
     sensitivity = tp/(tp+fn)
     specificity = tn/(fp+tn)
@@ -24,6 +28,12 @@ def get_model_metrics(confusion_matrix):
     print(f'NPV: {NPV}', '\n')
 
 def fast_regressor(X_array, y_array, multicollinearity_check):
+    '''
+    Takes x, y data and whether or not there needs to be a MC check and 
+    creates a LR object, prints accuracy and performance metrics,
+    and returns the fitted LR
+    '''
+
     reg = logisticRegression(X=X_array, y=y_array)
     reg_fitted, reg_probs, reg_pred = reg.logistic_regression_clf()
     reg.results()
@@ -35,14 +45,32 @@ def fast_regressor(X_array, y_array, multicollinearity_check):
     return reg_fitted
 
 def quartile_generator(data, feature):
-    quartiles = np.percentile(data[feature], [25, 50, 75, 100])
+    '''
+    Determines quartiles and returns the conditions and values to create 
+    a pandas column labeled according to the list values that is used for 
+    the interaction plot
+    '''
+    quartiles = np.percentile(data[feature], [25, 50, 75])
     conditions = [(df[feature] <= quartiles[0]),
-            (df[feature] > quartiles[0]) & (df[feature] <= quartiles[1]),
-            (df[feature] > quartiles[1]) & (df[feature] <= quartiles[2]),
-            (df[feature] > quartiles[2]) & (df[feature] <= quartiles[3])]
-    values = (f'$\leq$ {quartiles[0]:.2f}', f'{quartiles[0]:.2f} to {quartiles[1]:.2f}',
-            f'{quartiles[1]:.2f} to {quartiles[2]:.2f}', f'{quartiles[2]:.2f} to {quartiles[3]:.2f}')
+            (df[feature] > quartiles[0]) & (df[feature] < quartiles[2]),
+            (df[feature] > quartiles[2])]
+    values = ('<Q1', 'IQR', 'Q3<')
+    print(f'{feature} quartiles: {quartiles}')
     return conditions, values
+
+def velocity_calc(Q, areas):
+     velocs = 1000*Q/areas
+     return velocs/1000
+
+def diam_calc(areas):
+     diams = np.sqrt(4*areas/np.pi)
+     return diams/1000
+
+def reynolds_calc(Q, areas):
+    velocities = velocity_calc(Q, areas)
+    diameters = diam_calc(areas)
+    reynolds = diameters*velocities*1045/0.0035 
+    return reynolds
 
 if __name__ == '__main__':
     path = get_data_path()
@@ -58,34 +86,37 @@ if __name__ == '__main__':
     df = df[df["Flowrate"] < outlier_criteria]
     # endregion
 
-    # region FEATURE ENGINEERING
-    df["%DS"] = (1 - np.sqrt(4 * df["Stenosis Area"] / 4) / np.sqrt(4 * df["Mean Area"] / 4)) * 100
+    # FEATURE ENGINEERING
+    df["%DS"] = (1 - np.sqrt(4 * df["Stenosis Area"] / np.pi) / np.sqrt(4 * df["Mean Area"] / np.pi)) * 100
+    Re_number = pd.Series(data=reynolds_calc(df['Flowrate'], df['Mean Area']), name='Reynolds Number')
     df = df.drop(["Mean Area", "length", "Nominal", "Stenosis Position", "Beta"], axis=1)
-    # endregion
 
+    # Create conditiosn and values and map them to a new pandas column to get 
+    # a column labeled according to the quartile bin of another column
     q_conditions, q_values = quartile_generator(df, 'Flowrate')
-    # q_conditions = [(df['Flowrate'] <= 1.7475), (df['Flowrate'] > 1.7475)]
-    # q_values = ['Q &\leq$ 1.75', 'Q > 1.75']
-    ds_conditions = [(df['%DS'] <= 25), (df['%DS'] > 25)]
-    ds_values = ['%DS $\leq$ 25%', '%DS > 25%']
+    ds_conditions, ds_values = quartile_generator(df, '%DS')
+    df['reynolds'] = Re_number
+    re_conditions, re_values = quartile_generator(df, 'reynolds')
 
     df['flowratelabel'] = np.select(q_conditions, q_values)
     df['%DSlabel'] = np.select(ds_conditions, ds_values)
+    df['reynolds'] = np.select(re_conditions, re_values)
 
+    # Create the interactions plot of interest
     fig1, ax = plt.subplots(figsize=(6, 6))
     fig1 = interaction_plot(
-    x=df['flowratelabel'],
+    x=df['reynolds'],
     trace=df['%DSlabel'],
     response=df['FFR'],
-    colors=["red", "blue"],
+    colors=["blue", "red", "green"],
     ms=10,
     ax=ax,
-    xlabel='Coronary Flow Rate (ml/s)',
+    xlabel='Reynolds Number',
     ylabel='FFR',
     legendtitle='%DS')
-
-    # region CREATE INPUT AND TARGET ARRAYS
-    X = df.drop(["FFR", "Diagnosis"], axis=1)  # Data frame with %DS and Nominal
+    
+    # CREATE INPUT AND TARGET ARRAYS FOR REGRESSION 
+    X = df.drop(["FFR", "Diagnosis"], axis=1) 
     print(X.corr())
     y = pd.DataFrame()
     y["FFR"] = df['FFR']
