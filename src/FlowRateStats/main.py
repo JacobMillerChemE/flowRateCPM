@@ -9,7 +9,7 @@ from statsmodels.graphics.factorplots import interaction_plot
 
 def get_data_path():
     dirname = os.path.dirname(__file__)
-    data_path = dirname.replace('/src/FlowRateStats', '/dataFrame/Results3.csv')
+    data_path = dirname.replace('/src/FlowRateStats', '/dataFrame/Results4.csv')
     return data_path
 
 def get_model_metrics(confusion_matrix):
@@ -87,7 +87,7 @@ if __name__ == '__main__':
     # endregion
 
     # FEATURE ENGINEERING
-    df["%DS"] = (1 - np.sqrt(4 * df["Stenosis Area"] / np.pi) / np.sqrt(4 * df["Mean Area"] / np.pi)) * 100
+    df["%DS"] = (1 - np.sqrt(4 * df["Stenosis Area"] / np.pi) / np.sqrt(4 * df["Max Area"] / np.pi)) * 100
     Re_number = pd.Series(data=reynolds_calc(df['Flowrate'], df['Mean Area']), name='Reynolds Number')
     df = df.drop(["Mean Area", "length", "Nominal", "Stenosis Position", "Beta"], axis=1)
 
