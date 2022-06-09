@@ -95,6 +95,25 @@ if __name__ == '__main__':
     # Making healthy and unhealthy groups
     healthy = df[df['FFR'] > 0.8]
     unhealthy = df[df['FFR'] <= 0.8]
+    
+    # Make dictionary with groups
+    groups = {'healthy': healthy, 'unhealthy': unhealthy}
+
+    # Find means of %DS
+    print(healthy['%DS'].mean())
+    print(unhealthy['%DS'].mean())
+    
+    # Find means of coronary flow rate
+    print(healthy['Flowrate'].mean())
+    print(unhealthy['Flowrate'].mean())
 
     # Make testing object
-    testing = statsTests(groups=[healthy, unhealthy], df=df)
+    testing = statTests(groups=groups, df=df)
+
+    # Test for normality for %Ds and do appropraite test
+    testing.normality_check('%DS')
+    testing.t_test('%DS')
+
+    # Test for normality for  and do appropraite test
+    testing.normality_check('Flowrate')
+    testing.mannwhitney_test('Flowrate')
